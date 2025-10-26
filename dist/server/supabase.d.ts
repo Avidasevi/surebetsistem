@@ -1,3 +1,3 @@
-declare const supabase: import("@supabase/supabase-js").SupabaseClient<any, "public", "public", any, any>;
-export default supabase;
+declare const _default: import("@supabase/supabase-js").SupabaseClient<any, "public", "public", any, any>;
+export default _default;
 //# sourceMappingURL=supabase.d.ts.map

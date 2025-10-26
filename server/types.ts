@@ -19,9 +19,9 @@ export interface Banca {
   saldo_atual: number;
   meta_valor?: number;
   meta_percentual?: number;
-  status?: string;
-  cor?: string;
+  status: 'ativa' | 'pausada' | 'finalizada';
   created_at: string;
+  updated_at: string;
 }
 
 export interface Aposta {
@@ -32,22 +32,19 @@ export interface Aposta {
   casa_aposta: string;
   tipo_aposta: string;
   odd: number;
-  resultado?: string;
-  valor_recebido?: number;
+  resultado: 'ganhou' | 'perdeu' | 'empate';
+  valor_recebido: number;
   lucro: number;
-  categoria?: string;
-  esporte?: string;
-  liga?: string;
-  notas?: string;
   created_at: string;
+  banca_nome?: string;
 }
 
 export interface Calculo {
   id: string;
   user_id: string;
-  tipo: string;
+  tipo: '2_resultados' | '3_resultados' | 'arbitragem' | 'value_bet';
   odds: number[];
-  stake: number[];
+  stake: number;
   resultado: any;
   created_at: string;
 }
@@ -55,15 +52,29 @@ export interface Calculo {
 export interface Alerta {
   id: string;
   user_id: string;
-  tipo: string;
-  titulo: string;
+  tipo: 'surebet' | 'value_bet' | 'meta' | 'stop_loss';
   mensagem: string;
-  lido: boolean;
+  lida: boolean;
   created_at: string;
 }
 
-export interface AuthUser {
-  userId: string;
-  email: string;
-  isAdmin: boolean;
+export interface DashboardStats {
+  totalBancas: number;
+  saldoTotal: number;
+  lucroTotal: number;
+  roi: number;
+}
+
+export interface ChartData {
+  date: string;
+  lucro: number;
+  volume: number;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalBancas: number;
+  totalApostas: number;
+  volumeTotal: number;
+  lucroTotal: number;
 }

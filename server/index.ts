@@ -22,11 +22,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'quantum_surebet_secret_2024';
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Security headers
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Only apply CSP to HTML responses, not API responses
   if (req.path.startsWith('/api/') || req.path === '/health') {
     next();
     return;
@@ -49,11 +48,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Serve static files from client public directory
+// Serve static files
 const clientPublicPath = path.join(__dirname, '../client/public');
 app.use(express.static(clientPublicPath));
 
-// Serve static files if client build exists
 const clientBuildPath = path.join(__dirname, '../client/build');
 try {
   app.use(express.static(clientBuildPath));
@@ -62,29 +60,40 @@ try {
 }
 
 // Auth middleware
-const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader?.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Token requerido' });
+    res.status(401).json({ error: 'Token requerido' });
+    return;
   }
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) return res.status(403).json({ error: 'Token inválido' });
+    if (err) {
+      res.status(403).json({ error: 'Token inválido' });
+      return;
+    }
     req.user = user;
     next();
   });
 };
 
+const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user?.isAdmin) {
+    res.status(403).json({ error: 'Acesso negado - Admin requerido' });
+    return;
+  }
+  next();
+};
+
 // Auth Routes
 app.post('/api/register', async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  
   try {
+    const { email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('users')
       .insert([{ email, password: hashedPassword }])
       .select();
@@ -93,16 +102,16 @@ app.post('/api/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email já existe' });
     }
 
-    res.json({ message: 'Usuário criado com sucesso' });
+    return res.json({ message: 'Usuário criado com sucesso' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno' });
+    return res.status(500).json({ error: 'Erro interno' });
   }
 });
 
 app.post('/api/login', async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body;
+
     const { data: users, error } = await supabase
       .from('users')
       .select('*')
@@ -114,13 +123,20 @@ app.post('/api/login', async (req: Request, res: Response) => {
     }
 
     if (!users.aprovado && !users.is_admin) {
-      return res.status(403).json({ error: 'Conta pendente de aprovação pelo administrador' });
+      return res.status(403).json({ error: 'Conta pendente de aprovação' });
     }
 
-    const token = jwt.sign({ userId: users.id, email: users.email, isAdmin: users.is_admin }, JWT_SECRET);
-    res.json({ token, user: { id: users.id, email: users.email, isAdmin: users.is_admin } });
+    const token = jwt.sign(
+      { userId: users.id, email: users.email, isAdmin: users.is_admin }, 
+      JWT_SECRET
+    );
+    
+    return res.json({ 
+      token, 
+      user: { id: users.id, email: users.email, isAdmin: users.is_admin } 
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno' });
+    return res.status(500).json({ error: 'Erro interno' });
   }
 });
 
@@ -134,16 +150,16 @@ app.get('/api/bancas', authenticateToken, async (req: AuthRequest, res: Response
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json(data);
+    return res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar bancas' });
+    return res.status(500).json({ error: 'Erro ao buscar bancas' });
   }
 });
 
 app.post('/api/bancas', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { nome, valor_inicial, meta_valor, meta_percentual } = req.body;
-
   try {
+    const { nome, valor_inicial, meta_valor, meta_percentual } = req.body;
+
     const { data, error } = await supabase
       .from('bancas')
       .insert([{
@@ -157,9 +173,9 @@ app.post('/api/bancas', authenticateToken, async (req: AuthRequest, res: Respons
       .select();
 
     if (error) throw error;
-    res.json({ id: data[0].id, message: 'Banca criada com sucesso' });
+    return res.json({ id: data[0].id, message: 'Banca criada com sucesso' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao criar banca' });
+    return res.status(500).json({ error: 'Erro ao criar banca' });
   }
 });
 
@@ -182,16 +198,16 @@ app.get('/api/apostas', authenticateToken, async (req: AuthRequest, res: Respons
       banca_nome: aposta.bancas.nome
     }));
 
-    res.json(apostasFormatted);
+    return res.json(apostasFormatted);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar apostas' });
+    return res.status(500).json({ error: 'Erro ao buscar apostas' });
   }
 });
 
 app.post('/api/apostas', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { banca_id, data_aposta, valor_apostado, casa_aposta, tipo_aposta, odd, resultado, valor_recebido } = req.body;
-
   try {
+    const { banca_id, data_aposta, valor_apostado, casa_aposta, tipo_aposta, odd, resultado, valor_recebido } = req.body;
+
     // Verificar se a banca pertence ao usuário
     const { data: banca, error: bancaError } = await supabase
       .from('bancas')
@@ -234,14 +250,14 @@ app.post('/api/apostas', authenticateToken, async (req: AuthRequest, res: Respon
 
     if (updateError) throw updateError;
 
-    res.json({ 
+    return res.json({ 
       id: apostaData[0].id, 
       lucro, 
       novoSaldo, 
       message: 'Aposta registrada' 
     });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao registrar aposta' });
+    return res.status(500).json({ error: 'Erro ao registrar aposta' });
   }
 });
 
@@ -260,7 +276,7 @@ app.get('/api/dashboard', authenticateToken, async (req: AuthRequest, res: Respo
     const valorInicial = bancas.reduce((sum: number, b: any) => sum + b.valor_inicial, 0);
     const lucroTotal = saldoTotal - valorInicial;
 
-    res.json({
+    return res.json({
       bancas,
       resumo: {
         totalBancas,
@@ -270,11 +286,11 @@ app.get('/api/dashboard', authenticateToken, async (req: AuthRequest, res: Respo
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar dashboard' });
+    return res.status(500).json({ error: 'Erro ao buscar dashboard' });
   }
 });
 
-// Rotas avançadas
+// Charts Route
 app.get('/api/dashboard/charts', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data: evolution } = await supabase
@@ -305,16 +321,16 @@ app.get('/api/dashboard/charts', authenticateToken, async (req: AuthRequest, res
       return acc;
     }, []) || [];
 
-    res.json({ evolution: chartData, distribution: [] });
+    return res.json({ evolution: chartData, distribution: [] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar dados dos gráficos' });
+    return res.status(500).json({ error: 'Erro ao buscar dados dos gráficos' });
   }
 });
 
+// Calculos Routes
 app.post('/api/calculos', authenticateToken, async (req: AuthRequest, res: Response) => {
-  const { tipo, odds, stake, resultado } = req.body;
-
   try {
+    const { tipo, odds, stake, resultado } = req.body;
     const { data, error } = await supabase
       .from('calculos')
       .insert([{
@@ -327,9 +343,9 @@ app.post('/api/calculos', authenticateToken, async (req: AuthRequest, res: Respo
       .select();
 
     if (error) throw error;
-    res.json(data[0]);
+    return res.json(data[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao salvar cálculo' });
+    return res.status(500).json({ error: 'Erro ao salvar cálculo' });
   }
 });
 
@@ -343,12 +359,13 @@ app.get('/api/calculos', authenticateToken, async (req: AuthRequest, res: Respon
       .limit(50);
 
     if (error) throw error;
-    res.json(data || []);
+    return res.json(data || []);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar cálculos' });
+    return res.status(500).json({ error: 'Erro ao buscar cálculos' });
   }
 });
 
+// Alertas Route
 app.get('/api/alertas', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data, error } = await supabase
@@ -359,42 +376,36 @@ app.get('/api/alertas', authenticateToken, async (req: AuthRequest, res: Respons
       .limit(10);
 
     if (error) throw error;
-    res.json(data || []);
+    return res.json(data || []);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar alertas' });
+    return res.status(500).json({ error: 'Erro ao buscar alertas' });
   }
 });
-
-// Admin middleware
-const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user!.isAdmin) {
-    return res.status(403).json({ error: 'Acesso negado - Admin requerido' });
-  }
-  next();
-};
 
 // Admin Routes
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const { data: users } = await supabase.from('users').select('id');
-    const { data: bancas } = await supabase.from('bancas').select('id, valor_inicial, saldo_atual');
-    const { data: apostas } = await supabase.from('apostas').select('id, valor_apostado, lucro');
+    const [users, bancas, apostas] = await Promise.all([
+      supabase.from('users').select('id'),
+      supabase.from('bancas').select('id, valor_inicial, saldo_atual'),
+      supabase.from('apostas').select('id, valor_apostado, lucro')
+    ]);
 
     const stats = {
-      totalUsers: users?.length || 0,
-      totalBancas: bancas?.length || 0,
-      totalApostas: apostas?.length || 0,
-      volumeTotal: apostas?.reduce((sum: number, a: any) => sum + a.valor_apostado, 0) || 0,
-      lucroTotal: apostas?.reduce((sum: number, a: any) => sum + a.lucro, 0) || 0
+      totalUsers: users.data?.length || 0,
+      totalBancas: bancas.data?.length || 0,
+      totalApostas: apostas.data?.length || 0,
+      volumeTotal: apostas.data?.reduce((sum: number, a: any) => sum + a.valor_apostado, 0) || 0,
+      lucroTotal: apostas.data?.reduce((sum: number, a: any) => sum + a.lucro, 0) || 0
     };
 
-    res.json(stats);
+    return res.json(stats);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar estatísticas' });
+    return res.status(500).json({ error: 'Erro ao buscar estatísticas' });
   }
 });
 
-app.get('/api/admin/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -402,57 +413,9 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req: Request
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json(data);
+    return res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar usuários' });
-  }
-});
-
-app.get('/api/admin/bancas', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { data, error } = await supabase
-      .from('bancas')
-      .select(`
-        id, nome, valor_inicial, saldo_atual,
-        users!inner(email)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    
-    const bancasFormatted = data?.map((banca: any) => ({
-      ...banca,
-      user_email: banca.users.email
-    })) || [];
-
-    res.json(bancasFormatted);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar bancas' });
-  }
-});
-
-app.get('/api/admin/apostas', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { data, error } = await supabase
-      .from('apostas')
-      .select(`
-        *,
-        bancas!inner(nome, users!inner(email))
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (error) throw error;
-    
-    const apostasFormatted = data?.map((aposta: any) => ({
-      ...aposta,
-      banca_nome: aposta.bancas.nome,
-      user_email: aposta.bancas.users.email
-    })) || [];
-
-    res.json(apostasFormatted);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar apostas' });
+    return res.status(500).json({ error: 'Erro ao buscar usuários' });
   }
 });
 
@@ -468,9 +431,9 @@ app.patch('/api/admin/users/:id/approve', authenticateToken, requireAdmin, async
       .eq('id', req.params.id);
 
     if (error) throw error;
-    res.json({ message: 'Usuário aprovado com sucesso' });
+    return res.json({ message: 'Usuário aprovado com sucesso' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao aprovar usuário' });
+    return res.status(500).json({ error: 'Erro ao aprovar usuário' });
   }
 });
 
@@ -482,24 +445,9 @@ app.patch('/api/admin/users/:id/reject', authenticateToken, requireAdmin, async 
       .eq('id', req.params.id);
 
     if (error) throw error;
-    res.json({ message: 'Usuário rejeitado' });
+    return res.json({ message: 'Usuário rejeitado' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao rejeitar usuário' });
-  }
-});
-
-app.patch('/api/admin/users/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { nome, email, plano } = req.body;
-    const { error } = await supabase
-      .from('users')
-      .update({ nome, email, plano })
-      .eq('id', req.params.id);
-
-    if (error) throw error;
-    res.json({ message: 'Usuário atualizado com sucesso' });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar usuário' });
+    return res.status(500).json({ error: 'Erro ao rejeitar usuário' });
   }
 });
 
@@ -511,97 +459,54 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req: 
       .eq('id', req.params.id);
 
     if (error) throw error;
-    res.json({ message: 'Usuário excluído com sucesso' });
+    return res.json({ message: 'Usuário excluído com sucesso' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao excluir usuário' });
-  }
-});
-
-app.delete('/api/admin/bancas/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { error } = await supabase
-      .from('bancas')
-      .delete()
-      .eq('id', req.params.id);
-
-    if (error) throw error;
-    res.json({ message: 'Banca excluída com sucesso' });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao excluir banca' });
-  }
-});
-
-app.delete('/api/admin/apostas/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { error } = await supabase
-      .from('apostas')
-      .delete()
-      .eq('id', req.params.id);
-
-    if (error) throw error;
-    res.json({ message: 'Aposta excluída com sucesso' });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao excluir aposta' });
+    return res.status(500).json({ error: 'Erro ao excluir usuário' });
   }
 });
 
 // Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString(), version: '4.0.0-quantum' });
+app.get('/health', (_req: Request, res: Response) => {
+  return res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(), 
+    version: '5.0.0-optimized' 
+  });
 });
 
-// Serve static assets with proper headers
-app.get('/favicon.ico', (req: Request, res: Response) => {
+// Static assets
+app.get('/favicon.ico', (_req: Request, res: Response) => {
   const faviconPath = path.join(__dirname, '../client/public/favicon.ico');
-  
   res.setHeader('Content-Type', 'image/x-icon');
   res.setHeader('Cache-Control', 'public, max-age=31536000');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https: blob:;");
-  
-  res.sendFile(faviconPath, (err) => {
-    if (err) {
-      console.log('Favicon not found:', err.message);
-      res.status(404).end();
-    }
+  return res.sendFile(faviconPath, (err) => {
+    if (err) res.status(404).end();
   });
 });
 
-app.get('/manifest.json', (req: Request, res: Response) => {
+app.get('/manifest.json', (_req: Request, res: Response) => {
   const manifestPath = path.join(__dirname, '../client/public/manifest.json');
-  
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'public, max-age=31536000');
-  
-  res.sendFile(manifestPath, (err) => {
-    if (err) {
-      res.status(404).end();
-    }
+  return res.sendFile(manifestPath, (err) => {
+    if (err) res.status(404).end();
   });
 });
 
-app.get('/robots.txt', (req: Request, res: Response) => {
-  const robotsPath = path.join(__dirname, '../client/public/robots.txt');
-  
-  res.setHeader('Content-Type', 'text/plain');
-  res.setHeader('Cache-Control', 'public, max-age=86400');
-  
-  res.sendFile(robotsPath, (err) => {
-    if (err) {
-      res.status(404).end();
-    }
-  });
-});
-
-// Serve React app if available
-app.get('*', (req: Request, res: Response) => {
+// Serve React app
+app.get('*', (_req: Request, res: Response) => {
   const indexPath = path.join(__dirname, '../client/build/index.html');
   try {
-    res.sendFile(indexPath);
+    return res.sendFile(indexPath);
   } catch (err) {
-    res.json({ message: 'Quantum Surebet API is running', version: '4.0.0-quantum' });
+    return res.json({ 
+      message: 'Quantum Surebet API is running', 
+      version: '5.0.0-optimized',
+      endpoints: ['/api/register', '/api/login', '/api/dashboard', '/api/bancas', '/api/apostas', '/health']
+    });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor Supabase rodando na porta ${PORT}`);
+  console.log(`🚀 Quantum Surebet API v5.0.0 rodando na porta ${PORT}`);
 });
