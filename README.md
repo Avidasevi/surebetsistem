@@ -67,16 +67,27 @@ logs_auditoria - Auditoria completa
 ```
 
 #### **2. Deploy no Render**
-- **Build Command**: `npm run build`
+- **Build Command**: `npm install && npm run build`
 - **Start Command**: `npm start`
 - **Auto-deploy**: GitHub integration
+- **Node Version**: 18.0.0+
 
 #### **3. Variáveis de Ambiente**
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://pshmizivmvzjvwxouygj.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SUPABASE_URL=https://pshmizivmvzjvwxouygj.supabase.co
+SUPABASE_ANON_KEY=eyJ...
 JWT_SECRET=quantum_surebet_2024
+PORT=5000
+NODE_ENV=production
+```
+
+#### **4. Estrutura de Deploy**
+```
+dist/
+├── server/
+│   ├── index.js      # Servidor compilado
+│   ├── supabase.js   # Cliente Supabase
+│   └── types.js      # Tipos TypeScript
 ```
 
 ### 🔧 **Tecnologias de Ponta**
