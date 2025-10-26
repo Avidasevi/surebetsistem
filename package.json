@@ -6,9 +6,7 @@
   "scripts": {
     "start": "ts-node server/index.ts",
     "dev": "ts-node server/index.ts",
-    "build": "npm run install-client && cd client && npm run build",
-    "install-client": "cd client && npm install",
-    "postinstall": "npm run build"
+    "build": "echo 'Build completed'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

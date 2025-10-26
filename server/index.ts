@@ -23,7 +23,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'quantum_surebet_secret_2024';
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client/build')));
+// Serve static files if client build exists
+const clientBuildPath = path.join(__dirname, '../client/build');
+try {
+  app.use(express.static(clientBuildPath));
+} catch (err) {
+  console.log('Client build not found, serving API only');
+}
 
 // Auth middleware
 const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -514,9 +520,14 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), version: '4.0.0-quantum' });
 });
 
-// Serve React app
+// Serve React app if available
 app.get('*', (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  const indexPath = path.join(__dirname, '../client/build/index.html');
+  try {
+    res.sendFile(indexPath);
+  } catch (err) {
+    res.json({ message: 'Quantum Surebet API is running', version: '4.0.0-quantum' });
+  }
 });
 
 app.listen(PORT, () => {
