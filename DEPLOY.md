@@ -46,15 +46,17 @@ Start Command: npm start
 ```
 
 ### 4. Variáveis de Ambiente
-Adicione as seguintes variáveis no painel do Render:
+**CRÍTICO**: Adicione estas variáveis no painel do Render (Settings → Environment):
 
 | Chave | Valor | Descrição |
 |-------|-------|-----------|
 | `NODE_ENV` | `production` | Ambiente de produção |
 | `PORT` | `5000` | Porta do servidor |
-| `JWT_SECRET` | `quantum_surebet_2024` | Chave secreta JWT |
-| `SUPABASE_URL` | `https://xxx.supabase.co` | URL do Supabase |
-| `SUPABASE_ANON_KEY` | `eyJ...` | Chave anônima do Supabase |
+| `JWT_SECRET` | `quantum_surebet_secret_2024` | Chave secreta JWT |
+| `SUPABASE_URL` | `https://seu-projeto-id.supabase.co` | URL do Supabase |
+| `SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` | Chave anônima do Supabase |
+
+**⚠️ IMPORTANTE**: Sem essas variáveis, o deploy falhará!
 
 ## ✅ Verificação do Deploy
 
@@ -107,6 +109,14 @@ curl https://seu-app.onrender.com/manifest.json
 ### Erro: "JWT Secret not found"
 - Adicione a variável `JWT_SECRET` no painel do Render
 - Use um valor seguro e único
+
+### Erro: "SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórios"
+- **CAUSA**: Variáveis de ambiente não configuradas no Render
+- **SOLUÇÃO**: 
+  1. Acesse o painel do Render
+  2. Vá em Settings → Environment
+  3. Adicione as variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY`
+  4. Faça um novo deploy
 
 ### Erro: "Content Security Policy"
 - O sistema já está configurado com CSP otimizado

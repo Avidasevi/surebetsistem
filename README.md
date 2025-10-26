@@ -72,13 +72,20 @@ calculos       - Histórico de cálculos
 - **Auto-deploy**: GitHub integration
 
 #### **3. Variáveis de Ambiente**
+**IMPORTANTE**: Configure estas variáveis no painel do Render.com:
+
 ```env
 NODE_ENV=production
 PORT=5000
-JWT_SECRET=quantum_surebet_2024
-SUPABASE_URL=sua_url_supabase
-SUPABASE_ANON_KEY=sua_chave_supabase
+JWT_SECRET=quantum_surebet_secret_2024
+SUPABASE_URL=https://seu-projeto-id.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+**Como obter as chaves do Supabase:**
+1. Acesse [supabase.com](https://supabase.com)
+2. Vá em Settings → API
+3. Copie a URL do projeto e a chave anônima
 
 ### 🔧 **Tecnologias de Ponta**
 
