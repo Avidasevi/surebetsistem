@@ -1,10 +1,20 @@
-const express = require('express');
-const cors = require('cors');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const path = require('path');
-const supabase = require('./supabase');
-require('dotenv').config();
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import path from 'path';
+import supabase from './supabase';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+interface AuthRequest extends Request {
+  user?: {
+    userId: string;
+    email: string;
+    isAdmin: boolean;
+  };
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,7 +26,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Auth middleware
-const authenticateToken = (req, res, next) => {
+const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -24,7 +34,7 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Token requerido' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) return res.status(403).json({ error: 'Token inválido' });
     req.user = user;
     next();
@@ -32,7 +42,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Auth Routes
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', async (req: Request, res: Response) => {
   const { email, password } = req.body;
   
   try {
@@ -53,7 +63,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   try {
@@ -79,12 +89,12 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Bancas Routes
-app.get('/api/bancas', authenticateToken, async (req, res) => {
+app.get('/api/bancas', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('bancas')
       .select('*')
-      .eq('user_id', req.user.userId)
+      .eq('user_id', req.user!.userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -94,14 +104,14 @@ app.get('/api/bancas', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/bancas', authenticateToken, async (req, res) => {
+app.post('/api/bancas', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { nome, valor_inicial, meta_valor, meta_percentual } = req.body;
 
   try {
     const { data, error } = await supabase
       .from('bancas')
       .insert([{
-        user_id: req.user.userId,
+        user_id: req.user!.userId,
         nome,
         valor_inicial,
         saldo_atual: valor_inicial,
@@ -118,7 +128,7 @@ app.post('/api/bancas', authenticateToken, async (req, res) => {
 });
 
 // Apostas Routes
-app.get('/api/apostas', authenticateToken, async (req, res) => {
+app.get('/api/apostas', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('apostas')
@@ -126,12 +136,12 @@ app.get('/api/apostas', authenticateToken, async (req, res) => {
         *,
         bancas!inner(nome, user_id)
       `)
-      .eq('bancas.user_id', req.user.userId)
+      .eq('bancas.user_id', req.user!.userId)
       .order('data_aposta', { ascending: false });
 
     if (error) throw error;
     
-    const apostasFormatted = data.map(aposta => ({
+    const apostasFormatted = data.map((aposta: any) => ({
       ...aposta,
       banca_nome: aposta.bancas.nome
     }));
@@ -142,7 +152,7 @@ app.get('/api/apostas', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/apostas', authenticateToken, async (req, res) => {
+app.post('/api/apostas', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { banca_id, data_aposta, valor_apostado, casa_aposta, tipo_aposta, odd, resultado, valor_recebido } = req.body;
 
   try {
@@ -151,7 +161,7 @@ app.post('/api/apostas', authenticateToken, async (req, res) => {
       .from('bancas')
       .select('*')
       .eq('id', banca_id)
-      .eq('user_id', req.user.userId)
+      .eq('user_id', req.user!.userId)
       .single();
 
     if (bancaError || !banca) {
@@ -200,18 +210,18 @@ app.post('/api/apostas', authenticateToken, async (req, res) => {
 });
 
 // Dashboard Route
-app.get('/api/dashboard', authenticateToken, async (req, res) => {
+app.get('/api/dashboard', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data: bancas, error } = await supabase
       .from('bancas')
       .select('*')
-      .eq('user_id', req.user.userId);
+      .eq('user_id', req.user!.userId);
 
     if (error) throw error;
 
     const totalBancas = bancas.length;
-    const saldoTotal = bancas.reduce((sum, b) => sum + b.saldo_atual, 0);
-    const valorInicial = bancas.reduce((sum, b) => sum + b.valor_inicial, 0);
+    const saldoTotal = bancas.reduce((sum: number, b: any) => sum + b.saldo_atual, 0);
+    const valorInicial = bancas.reduce((sum: number, b: any) => sum + b.valor_inicial, 0);
     const lucroTotal = saldoTotal - valorInicial;
 
     res.json({
@@ -229,7 +239,7 @@ app.get('/api/dashboard', authenticateToken, async (req, res) => {
 });
 
 // Rotas avançadas
-app.get('/api/dashboard/charts', authenticateToken, async (req, res) => {
+app.get('/api/dashboard/charts', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data: evolution } = await supabase
       .from('apostas')
@@ -239,10 +249,10 @@ app.get('/api/dashboard/charts', authenticateToken, async (req, res) => {
         valor_apostado,
         bancas!inner(user_id)
       `)
-      .eq('bancas.user_id', req.user.userId)
+      .eq('bancas.user_id', req.user!.userId)
       .order('data_aposta');
 
-    const chartData = evolution?.reduce((acc: any[], aposta) => {
+    const chartData = evolution?.reduce((acc: any[], aposta: any) => {
       const month = aposta.data_aposta.substring(0, 7);
       const existing = acc.find(item => item.date === month);
       
@@ -265,14 +275,14 @@ app.get('/api/dashboard/charts', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/calculos', authenticateToken, async (req, res) => {
+app.post('/api/calculos', authenticateToken, async (req: AuthRequest, res: Response) => {
   const { tipo, odds, stake, resultado } = req.body;
 
   try {
     const { data, error } = await supabase
       .from('calculos')
       .insert([{
-        user_id: req.user.userId,
+        user_id: req.user!.userId,
         tipo,
         odds,
         stake,
@@ -287,12 +297,12 @@ app.post('/api/calculos', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/calculos', authenticateToken, async (req, res) => {
+app.get('/api/calculos', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('calculos')
       .select('*')
-      .eq('user_id', req.user.userId)
+      .eq('user_id', req.user!.userId)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -303,12 +313,12 @@ app.get('/api/calculos', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/alertas', authenticateToken, async (req, res) => {
+app.get('/api/alertas', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('alertas')
       .select('*')
-      .eq('user_id', req.user.userId)
+      .eq('user_id', req.user!.userId)
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -320,15 +330,15 @@ app.get('/api/alertas', authenticateToken, async (req, res) => {
 });
 
 // Admin middleware
-const requireAdmin = (req, res, next) => {
-  if (!req.user.isAdmin) {
+const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user!.isAdmin) {
     return res.status(403).json({ error: 'Acesso negado - Admin requerido' });
   }
   next();
 };
 
 // Admin Routes
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { data: users } = await supabase.from('users').select('id');
     const { data: bancas } = await supabase.from('bancas').select('id, valor_inicial, saldo_atual');
@@ -338,8 +348,8 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
       totalUsers: users?.length || 0,
       totalBancas: bancas?.length || 0,
       totalApostas: apostas?.length || 0,
-      volumeTotal: apostas?.reduce((sum, a) => sum + a.valor_apostado, 0) || 0,
-      lucroTotal: apostas?.reduce((sum, a) => sum + a.lucro, 0) || 0
+      volumeTotal: apostas?.reduce((sum: number, a: any) => sum + a.valor_apostado, 0) || 0,
+      lucroTotal: apostas?.reduce((sum: number, a: any) => sum + a.lucro, 0) || 0
     };
 
     res.json(stats);
@@ -348,7 +358,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
-app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -362,7 +372,7 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
-app.get('/api/admin/bancas', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/bancas', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('bancas')
@@ -374,7 +384,7 @@ app.get('/api/admin/bancas', authenticateToken, requireAdmin, async (req, res) =
 
     if (error) throw error;
     
-    const bancasFormatted = data?.map(banca => ({
+    const bancasFormatted = data?.map((banca: any) => ({
       ...banca,
       user_email: banca.users.email
     })) || [];
@@ -385,7 +395,7 @@ app.get('/api/admin/bancas', authenticateToken, requireAdmin, async (req, res) =
   }
 });
 
-app.get('/api/admin/apostas', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/apostas', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('apostas')
@@ -398,7 +408,7 @@ app.get('/api/admin/apostas', authenticateToken, requireAdmin, async (req, res) 
 
     if (error) throw error;
     
-    const apostasFormatted = data?.map(aposta => ({
+    const apostasFormatted = data?.map((aposta: any) => ({
       ...aposta,
       banca_nome: aposta.bancas.nome,
       user_email: aposta.bancas.users.email
@@ -410,14 +420,14 @@ app.get('/api/admin/apostas', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
-app.patch('/api/admin/users/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
+app.patch('/api/admin/users/:id/approve', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { error } = await supabase
       .from('users')
       .update({ 
         aprovado: true, 
         aprovado_em: new Date().toISOString(),
-        aprovado_por: req.user.userId 
+        aprovado_por: req.user!.userId 
       })
       .eq('id', req.params.id);
 
@@ -428,7 +438,7 @@ app.patch('/api/admin/users/:id/approve', authenticateToken, requireAdmin, async
   }
 });
 
-app.patch('/api/admin/users/:id/reject', authenticateToken, requireAdmin, async (req, res) => {
+app.patch('/api/admin/users/:id/reject', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { error } = await supabase
       .from('users')
@@ -442,7 +452,7 @@ app.patch('/api/admin/users/:id/reject', authenticateToken, requireAdmin, async 
   }
 });
 
-app.patch('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.patch('/api/admin/users/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { nome, email, plano } = req.body;
     const { error } = await supabase
@@ -457,7 +467,7 @@ app.patch('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, r
   }
 });
 
-app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { error } = await supabase
       .from('users')
@@ -471,7 +481,7 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
   }
 });
 
-app.delete('/api/admin/bancas/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/api/admin/bancas/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { error } = await supabase
       .from('bancas')
@@ -485,7 +495,7 @@ app.delete('/api/admin/bancas/:id', authenticateToken, requireAdmin, async (req,
   }
 });
 
-app.delete('/api/admin/apostas/:id', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/api/admin/apostas/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { error } = await supabase
       .from('apostas')
@@ -500,12 +510,12 @@ app.delete('/api/admin/apostas/:id', authenticateToken, requireAdmin, async (req
 });
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), version: '4.0.0-quantum' });
 });
 
 // Serve React app
-app.get('*', (req, res) => {
+app.get('*', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
