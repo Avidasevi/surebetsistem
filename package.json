@@ -2,7 +2,7 @@
   "name": "quantum-surebet-supabase",
   "version": "1.0.0",
   "description": "Sistema futurístico de surebets com React e Supabase",
-  "main": "dist/server/index.js",
+  "main": "server/index.ts",
   "scripts": {
     "start": "ts-node server/index.ts",
     "dev": "ts-node server/index.ts",
