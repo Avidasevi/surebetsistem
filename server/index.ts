@@ -26,7 +26,23 @@ app.use(express.json());
 
 // Security headers
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' data:; connect-src 'self' https:;");
+  // Only apply CSP to HTML responses, not API responses
+  if (req.path.startsWith('/api/') || req.path === '/health') {
+    next();
+    return;
+  }
+  
+  res.setHeader('Content-Security-Policy', 
+    "default-src 'self'; " +
+    "img-src 'self' data: https: blob:; " +
+    "style-src 'self' 'unsafe-inline' https:; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; " +
+    "font-src 'self' data: https:; " +
+    "connect-src 'self' https: wss:; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'"
+  );
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -534,10 +550,42 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), version: '4.0.0-quantum' });
 });
 
-// Serve favicon specifically
+// Serve static assets with proper headers
 app.get('/favicon.ico', (req: Request, res: Response) => {
   const faviconPath = path.join(__dirname, '../client/public/favicon.ico');
+  
+  res.setHeader('Content-Type', 'image/x-icon');
+  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https: blob:;");
+  
   res.sendFile(faviconPath, (err) => {
+    if (err) {
+      console.log('Favicon not found:', err.message);
+      res.status(404).end();
+    }
+  });
+});
+
+app.get('/manifest.json', (req: Request, res: Response) => {
+  const manifestPath = path.join(__dirname, '../client/public/manifest.json');
+  
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  
+  res.sendFile(manifestPath, (err) => {
+    if (err) {
+      res.status(404).end();
+    }
+  });
+});
+
+app.get('/robots.txt', (req: Request, res: Response) => {
+  const robotsPath = path.join(__dirname, '../client/public/robots.txt');
+  
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  
+  res.sendFile(robotsPath, (err) => {
     if (err) {
       res.status(404).end();
     }
