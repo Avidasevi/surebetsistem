@@ -22,19 +22,16 @@ app.use((req, res, next) => {
         req.path === '/favicon.ico' ||
         req.path === '/manifest.json' ||
         req.path === '/robots.txt' ||
-        req.path.startsWith('/static/')) {
+        req.path.startsWith('/static/') ||
+        req.path.endsWith('.ico') ||
+        req.path.endsWith('.png') ||
+        req.path.endsWith('.jpg') ||
+        req.path.endsWith('.jpeg') ||
+        req.path.endsWith('.gif') ||
+        req.path.endsWith('.svg')) {
         next();
         return;
     }
-    res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-        "img-src 'self' data: blob: https: http:; " +
-        "style-src 'self' 'unsafe-inline' https: http:; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:; " +
-        "font-src 'self' data: https: http:; " +
-        "connect-src 'self' https: http: wss: ws:; " +
-        "object-src 'none'; " +
-        "base-uri 'self'; " +
-        "form-action 'self'");
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -56,6 +53,7 @@ app.use('/static', express_1.default.static(clientPublicPath, {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
         res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.removeHeader('Content-Security-Policy');
     }
 }));
 const clientBuildPath = path_1.default.join(__dirname, '../client/build');
@@ -67,6 +65,7 @@ try {
                 res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
             }
             res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.removeHeader('Content-Security-Policy');
         }
     }));
 }
@@ -448,8 +447,8 @@ app.get('/favicon.ico', (_req, res) => {
     const faviconPath = path_1.default.join(__dirname, '../client/public/favicon.ico');
     res.setHeader('Content-Type', 'image/x-icon');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob: https: http:;");
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.removeHeader('Content-Security-Policy');
     return res.sendFile(faviconPath, (err) => {
         if (err) {
             console.log('Favicon not found:', err.message);
@@ -462,6 +461,7 @@ app.get('/manifest.json', (_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.removeHeader('Content-Security-Policy');
     return res.sendFile(manifestPath, (err) => {
         if (err) {
             console.log('Manifest not found:', err.message);
@@ -473,6 +473,7 @@ app.get('/robots.txt', (_req, res) => {
     const robotsPath = path_1.default.join(__dirname, '../client/public/robots.txt');
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.removeHeader('Content-Security-Policy');
     return res.sendFile(robotsPath, (err) => {
         if (err) {
             console.log('Robots.txt not found:', err.message);

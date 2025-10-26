@@ -32,30 +32,26 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       req.path === '/favicon.ico' || 
       req.path === '/manifest.json' ||
       req.path === '/robots.txt' ||
-      req.path.startsWith('/static/')) {
+      req.path.startsWith('/static/') ||
+      req.path.endsWith('.ico') ||
+      req.path.endsWith('.png') ||
+      req.path.endsWith('.jpg') ||
+      req.path.endsWith('.jpeg') ||
+      req.path.endsWith('.gif') ||
+      req.path.endsWith('.svg')) {
     next();
     return;
   }
   
-  // CSP mais permissivo para resolver problemas de favicon
-  res.setHeader('Content-Security-Policy', 
-    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-    "img-src 'self' data: blob: https: http:; " +
-    "style-src 'self' 'unsafe-inline' https: http:; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:; " +
-    "font-src 'self' data: https: http:; " +
-    "connect-src 'self' https: http: wss: ws:; " +
-    "object-src 'none'; " +
-    "base-uri 'self'; " +
-    "form-action 'self'"
-  );
+  // CSP desabilitado para resolver problemas de favicon
+  // Apenas headers básicos de segurança
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
 });
 
-// Serve static files with proper headers
+// Serve static files with proper headers - SEM CSP
 const clientPublicPath = path.join(__dirname, '../client/public');
 app.use('/static', express.static(clientPublicPath, {
   setHeaders: (res, path) => {
@@ -70,6 +66,8 @@ app.use('/static', express.static(clientPublicPath, {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Remover CSP para arquivos estáticos
+    res.removeHeader('Content-Security-Policy');
   }
 }));
 
@@ -82,6 +80,8 @@ try {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       }
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Remover CSP para arquivos estáticos
+      res.removeHeader('Content-Security-Policy');
     }
   }));
 } catch (err) {
@@ -503,15 +503,17 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Static assets with explicit headers
+// Static assets with explicit headers - SEM CSP
 app.get('/favicon.ico', (_req: Request, res: Response) => {
   const faviconPath = path.join(__dirname, '../client/public/favicon.ico');
   
-  // Headers específicos para favicon
+  // Headers específicos para favicon - SEM CSP
   res.setHeader('Content-Type', 'image/x-icon');
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob: https: http:;");
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // Remover qualquer CSP que possa estar sendo aplicado
+  res.removeHeader('Content-Security-Policy');
   
   return res.sendFile(faviconPath, (err) => {
     if (err) {
@@ -527,6 +529,7 @@ app.get('/manifest.json', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.removeHeader('Content-Security-Policy');
   
   return res.sendFile(manifestPath, (err) => {
     if (err) {
@@ -541,6 +544,7 @@ app.get('/robots.txt', (_req: Request, res: Response) => {
   
   res.setHeader('Content-Type', 'text/plain');
   res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.removeHeader('Content-Security-Policy');
   
   return res.sendFile(robotsPath, (err) => {
     if (err) {
