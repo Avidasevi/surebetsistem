@@ -23,6 +23,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'quantum_surebet_secret_2024';
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Security headers
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; font-src 'self' data:; connect-src 'self' https:;");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// Serve static files from client public directory
+const clientPublicPath = path.join(__dirname, '../client/public');
+app.use(express.static(clientPublicPath));
+
 // Serve static files if client build exists
 const clientBuildPath = path.join(__dirname, '../client/build');
 try {
@@ -518,6 +532,16 @@ app.delete('/api/admin/apostas/:id', authenticateToken, requireAdmin, async (req
 // Health check
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), version: '4.0.0-quantum' });
+});
+
+// Serve favicon specifically
+app.get('/favicon.ico', (req: Request, res: Response) => {
+  const faviconPath = path.join(__dirname, '../client/public/favicon.ico');
+  res.sendFile(faviconPath, (err) => {
+    if (err) {
+      res.status(404).end();
+    }
+  });
 });
 
 // Serve React app if available

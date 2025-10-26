@@ -39,9 +39,11 @@ Root Directory: (deixar vazio)
 
 ### 3. Build & Deploy
 ```
-Build Command: npm install && npm run build
+Build Command: npm run render-build
 Start Command: npm start
 ```
+
+**Importante**: A pasta `dist/` com os arquivos compilados já está incluída no repositório para garantir que o deploy funcione corretamente.
 
 ### 4. Variáveis de Ambiente
 Adicione as seguintes variáveis no painel do Render:
