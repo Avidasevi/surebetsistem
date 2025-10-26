@@ -15,8 +15,7 @@
     "sourceMap": true
   },
   "include": [
-    "server/**/*",
-    "*.ts"
+    "server/**/*"
   ],
   "exclude": [
     "node_modules",
