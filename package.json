@@ -6,11 +6,10 @@
   "scripts": {
     "start": "node dist/server/index.js",
     "dev": "ts-node server/index.ts",
-    "build": "npm run build:server && cd client && npm run build",
+    "build": "npm run build:server && npm run install-client && cd client && npm run build",
     "build:server": "tsc",
     "install-client": "cd client && npm install",
-    "postinstall": "npm run install-client",
-    "render-build": "npm run build"
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
