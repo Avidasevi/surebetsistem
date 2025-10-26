@@ -24,37 +24,66 @@ const JWT_SECRET = process.env.JWT_SECRET || 'quantum_surebet_secret_2024';
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Security headers
+// Security headers - Aplicar apenas para rotas HTML
 app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.path.startsWith('/api/') || req.path === '/health') {
+  // Não aplicar CSP para APIs, health check ou arquivos estáticos
+  if (req.path.startsWith('/api/') || 
+      req.path === '/health' || 
+      req.path === '/favicon.ico' || 
+      req.path === '/manifest.json' ||
+      req.path === '/robots.txt' ||
+      req.path.startsWith('/static/')) {
     next();
     return;
   }
   
+  // CSP mais permissivo para resolver problemas de favicon
   res.setHeader('Content-Security-Policy', 
-    "default-src 'self'; " +
-    "img-src 'self' data: https: blob:; " +
-    "style-src 'self' 'unsafe-inline' https:; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; " +
-    "font-src 'self' data: https:; " +
-    "connect-src 'self' https: wss:; " +
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+    "img-src 'self' data: blob: https: http:; " +
+    "style-src 'self' 'unsafe-inline' https: http:; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:; " +
+    "font-src 'self' data: https: http:; " +
+    "connect-src 'self' https: http: wss: ws:; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self'"
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
 });
 
-// Serve static files
+// Serve static files with proper headers
 const clientPublicPath = path.join(__dirname, '../client/public');
-app.use(express.static(clientPublicPath));
+app.use('/static', express.static(clientPublicPath, {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.ico')) {
+      res.setHeader('Content-Type', 'image/x-icon');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+}));
 
 const clientBuildPath = path.join(__dirname, '../client/build');
 try {
-  app.use(express.static(clientBuildPath));
+  app.use(express.static(clientBuildPath, {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.ico')) {
+        res.setHeader('Content-Type', 'image/x-icon');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+  }));
 } catch (err) {
   console.log('Client build not found, serving API only');
 }
@@ -474,22 +503,50 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Static assets
+// Static assets with explicit headers
 app.get('/favicon.ico', (_req: Request, res: Response) => {
   const faviconPath = path.join(__dirname, '../client/public/favicon.ico');
+  
+  // Headers específicos para favicon
   res.setHeader('Content-Type', 'image/x-icon');
-  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob: https: http:;");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
   return res.sendFile(faviconPath, (err) => {
-    if (err) res.status(404).end();
+    if (err) {
+      console.log('Favicon not found:', err.message);
+      res.status(404).end();
+    }
   });
 });
 
 app.get('/manifest.json', (_req: Request, res: Response) => {
   const manifestPath = path.join(__dirname, '../client/public/manifest.json');
+  
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
   return res.sendFile(manifestPath, (err) => {
-    if (err) res.status(404).end();
+    if (err) {
+      console.log('Manifest not found:', err.message);
+      res.status(404).end();
+    }
+  });
+});
+
+app.get('/robots.txt', (_req: Request, res: Response) => {
+  const robotsPath = path.join(__dirname, '../client/public/robots.txt');
+  
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  
+  return res.sendFile(robotsPath, (err) => {
+    if (err) {
+      console.log('Robots.txt not found:', err.message);
+      res.status(404).end();
+    }
   });
 });
 
